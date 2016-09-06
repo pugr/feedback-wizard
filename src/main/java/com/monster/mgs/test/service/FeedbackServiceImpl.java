@@ -1,5 +1,6 @@
 package com.monster.mgs.test.service;
 
+import com.google.common.collect.Lists;
 import com.monster.mgs.test.bo.CourseBo;
 import com.monster.mgs.test.bo.CourseSectionBo;
 import com.monster.mgs.test.bo.FeedbackBo;
@@ -14,18 +15,19 @@ import com.monster.mgs.test.repository.TrainingCourseSectionRepository;
 import com.monster.mgs.test.repository.VisitorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import javax.transaction.Transactional;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.StreamSupport;
 
 import static java.util.stream.Collectors.toList;
 
 /**
  * Implementation of {@link com.monster.mgs.test.service.FeedbackService}
- *
+ * <p>
  * Created by Jan Koren on 9/4/2016.
  */
 @Service
@@ -46,10 +48,11 @@ public class FeedbackServiceImpl implements FeedbackService {
      */
     @Override
     public FeedbackInputDataBo getAllTrainingCourses() {
-        final List<TrainingCourse> trainingCourses = StreamSupport
-                .stream(trainingCourseRepository.findAll().spliterator(), false)
-                .collect(toList());
-        return new FeedbackInputDataBo(trainingCourses);
+        final Iterable<TrainingCourse> trainingCourses = trainingCourseRepository.findAll();
+        if (trainingCourses == null || !trainingCourses.iterator().hasNext()) {
+            throw new IllegalStateException("No training courses found.");
+        }
+        return new FeedbackInputDataBo(Lists.newArrayList(trainingCourses));
     }
 
     /**
@@ -57,7 +60,11 @@ public class FeedbackServiceImpl implements FeedbackService {
      */
     @Override
     public Set<TrainingCourseSection> getTrainingSectionsByCourse(Long courseId) {
-        return trainingCourseSectionRepository.findAllForCourse(courseId);
+        final Set<TrainingCourseSection> courseSections = trainingCourseSectionRepository.findAllForCourse(courseId);
+        if (CollectionUtils.isEmpty(courseSections)) {
+            throw new IllegalStateException(String.format("No training course sections for course ID %d found.", courseId));
+        }
+        return courseSections;
     }
 
     /**
@@ -65,7 +72,7 @@ public class FeedbackServiceImpl implements FeedbackService {
      */
     @Override
     public String getTrainingCourseName(Long trainingCourseId) {
-        return Optional.of(trainingCourseRepository.findById(trainingCourseId))
+        return Optional.ofNullable(trainingCourseRepository.findById(trainingCourseId))
                 .map(TrainingCourse::getName)
                 .orElseThrow(() -> new IllegalStateException("Missing training course name for id " + trainingCourseId));
     }
@@ -75,7 +82,7 @@ public class FeedbackServiceImpl implements FeedbackService {
      */
     @Override
     public String getCourseSectionName(Long courseSectionId) {
-        return Optional.of(trainingCourseSectionRepository.findOne(courseSectionId))
+        return Optional.ofNullable(trainingCourseSectionRepository.findOne(courseSectionId))
                 .map(TrainingCourseSection::getName)
                 .orElseThrow(() -> new IllegalStateException("Missing training course section name for id " + courseSectionId));
     }
@@ -110,7 +117,12 @@ public class FeedbackServiceImpl implements FeedbackService {
      */
     @Override
     public List<FeedbackBo> listFeedbacks() {
-        return StreamSupport.stream(feedbackRepository.findAll().spliterator(), false)
+        final Iterable<TrainingCourseFeedback> allFeedbacks = feedbackRepository.findAll();
+        if (allFeedbacks == null) {
+            return Collections.emptyList();
+        }
+
+        return Lists.newArrayList(allFeedbacks).stream()
                 .map(this::toFeedbackBo)
                 .collect(toList());
     }
@@ -142,6 +154,6 @@ public class FeedbackServiceImpl implements FeedbackService {
         visitor.setEmailAddress(feedbackBo.getEmailAddress());
         visitor.setFirstName(feedbackBo.getFirstName());
         visitor.setLastName(feedbackBo.getLastName());
-        return  visitor;
+        return visitor;
     }
 }
